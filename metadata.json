@@ -1,0 +1,6 @@
+{
+  "name": "Life Sort",
+  "description": "An ecstatic, contemplative cosmic task sorter and life growth orchestrator powered by Gemini and Supabase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
