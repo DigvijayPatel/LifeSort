@@ -95,7 +95,7 @@ async function authorizeHandler(request: Request, env: Env): Promise<Response> {
   if (!client) return html("<h2>Unknown OAuth client</h2>", 400);
   const returnTo = safeReturnTo(url.pathname + url.search);
   if (request.method === "GET") {
-    return html(`<h2>Authorize ChatGPT?</h2><p class="muted">Client: ${escapeHtml(client.clientName ?? "MCP client")}</p><p>This grants access to control OpenHands conversations in <strong>${REPOSITORY}</strong>. It can start tasks, read events, send instructions, and pause or resume sandboxes.</p><form method="post" action="/authorize"><input type="hidden" name="return_to" value="${escapeHtml(returnTo)}"><button type="submit">Approve access</button></form><p class="muted">You can revoke this connection from ChatGPT's connected apps.</p>`);
+    return html(`<h2>Authorize ChatGPT?</h2><p class="muted">Client: ${escapeHtml(client.clientName ?? "MCP client")}</p><p>This grants access to control OpenHands conversations in <strong>${REPOSITORY}</strong>. It can start tasks, read events, send instructions, and pause or resume sandboxes.</p><form method="post" action="${escapeHtml(returnTo)}"><input type="hidden" name="return_to" value="${escapeHtml(returnTo)}"><button type="submit">Approve access</button></form><p class="muted">You can revoke this connection from ChatGPT's connected apps.</p>`);
   }
   const form = await request.formData();
   if (String(form.get("return_to") ?? "") !== returnTo) return html("<h2>Invalid authorization request</h2>", 400);
