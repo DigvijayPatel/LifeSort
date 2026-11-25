@@ -16,7 +16,7 @@ A Cloudflare Worker exposing a Streamable HTTP MCP endpoint for OpenHands Cloud.
 1. Create a KV namespace named `lifesort-openhands-oauth`.
 2. Copy its namespace ID into `wrangler.jsonc`, replacing `REPLACE_WITH_KV_NAMESPACE_ID`.
 3. Set the Cloudflare Worker build root to `infra/openhands-control`.
-4. Use build command `npm ci` and deploy command `npx wrangler deploy`.
+4. Use build command `npm install` and deploy command `npx wrangler deploy`.
 5. Add Worker secrets:
    - `OPENHANDS_CLOUD_API_KEY`: the API key from OpenHands Cloud.
    - `BRIDGE_LOGIN_PASSWORD`: a unique, high-entropy password for the OAuth login page.
