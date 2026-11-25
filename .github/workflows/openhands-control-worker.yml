@@ -1,0 +1,25 @@
+name: OpenHands Control Worker
+on:
+  pull_request:
+    paths:
+      - "infra/openhands-control/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/openhands-control/**"
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/openhands-control
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: infra/openhands-control/package.json
+      - run: npm install
+      - run: npm run check
