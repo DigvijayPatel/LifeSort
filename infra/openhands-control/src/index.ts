@@ -4,7 +4,8 @@ import { createMcpHandler } from "agents/mcp/server";
 import { z } from "zod";
 
 interface Env {
-  OAUTH_KV: { get(key: string): Promise<string | null>; put(key: string, value: string, options?: unknown): Promise<void> };
+  OAUTH_KV: KVNamespace;
+  OAUTH_PROVIDER: { parseAuthRequest(r: Request): Promise<AuthRequest>; lookupClient(id: string): Promise<{ clientName?: string } | null>; completeAuthorization(args: unknown): Promise<{ redirectTo: string }> };
   OPENHANDS_CLOUD_API_KEY: string;
   BRIDGE_LOGIN_PASSWORD: string;
   SESSION_SIGNING_SECRET: string;
@@ -130,6 +131,13 @@ function createServer(env: Env) {
     if (title) body.title = title;
     return jsonText(await oh(env, "/app-conversations", { method: "POST", body: JSON.stringify(body) }));
   });
+  server.registerTool("openhands_get_start_task", { description: "Check whether an OpenHands Cloud task has finished starting.", inputSchema: { start_task_id: z.string().uuid() } }, async ({ start_task_id }) => jsonText(await oh(env, `/app-conversations/start-tasks?ids=${encodeURIComponent(start_task_id)}`)));
+  server.registerTool("openhands_send_message", { description: "Send a follow-up instruction to an existing LifeSort OpenHands conversation.", inputSchema: { conversation_id: z.string().uuid(), message: z.string().min(1).max(12000) } }, async ({ conversation_id, message }) => {
+    const conv: any = await oh(env, `/app-conversations?ids=${encodeURIComponent(conversation_id)}`);
+    const items = Array.isArray(conv) ? conv : (conv.items ?? []);
+    if (!items.some((v: any) => v.id === conversation_id && v.selected_repository === REPOSITORY)) throw new Error("Conversation not found in the allowed LifeSort repository.");
+    return jsonText(await oh(env, `/app-conversations/${encodeURIComponent(conversation_id)}/send-message`, { method: "POST", body: JSON.stringify({ message }) }));
+  });
   server.registerTool("openhands_get_conversation", { description: "Fetch status and metadata for a LifeSort OpenHands conversation.", inputSchema: { conversation_id: z.string().uuid() } }, async ({ conversation_id }) => {
     const data: any = await oh(env, `/app-conversations?ids=${encodeURIComponent(conversation_id)}`);
     const items = Array.isArray(data) ? data : (data.items ?? []);
@@ -167,11 +175,6 @@ export default new OAuthProvider<Env>({
   tokenEndpoint: "/oauth/token",
   clientRegistrationEndpoint: "/oauth/register",
   scopesSupported: ["openhands:control"],
-  resourceMetadata: {
-    authorization_servers: [],
-    scopes_supported: ["openhands:control"],
-    bearer_methods_supported: ["header"],
-    resource_name: "LifeSort OpenHands Control"
-  },
+  requiredScopes: ["openhands:control"],
   clientIdMetadataDocumentEnabled: true,
 });
