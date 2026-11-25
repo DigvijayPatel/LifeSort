@@ -70,10 +70,10 @@ async function authorizeHandler(request: Request, env: Env): Promise<Response> {
     return new Response(null, { status: 303, headers: { location: returnTo, "set-cookie": `${SESSION_COOKIE}=${await createSession(env)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=28800`, "cache-control": "no-store" } });
   }
 
-  if (url.pathname !== "/authorize" || request.method !== "GET") return new Response("Not found", { status: 404 });
+  if (url.pathname !== "/authorize" || (request.method !== "GET" && request.method !== "POST")) return new Response("Not found", { status: 404 });
   let oauthRequest: AuthRequest;
   try {
-    oauthRequest = await (env as Env & { OAUTH_PROVIDER: { parseAuthRequest(r: Request): Promise<AuthRequest> } }).OAUTH_PROVIDER.parseAuthRequest(request);
+    oauthRequest = await (env as Env & { OAUTH_PROVIDER: { parseAuthRequest(r: Request): Promise<AuthRequest> } }).OAUTH_PROVIDER.parseAuthRequest(new Request(url.toString(), { method: "GET", headers: request.headers }));
   } catch (error) {
     if (!(error instanceof AuthorizationError)) throw error;
     if (!error.redirectUri) return html(`<h2>Authorization request rejected</h2><p>${escapeHtml(error.description)}</p>`, 400);
@@ -90,9 +90,15 @@ async function authorizeHandler(request: Request, env: Env): Promise<Response> {
     return html(`<h2>LifeSort OpenHands Control</h2><p class="muted">Sign in to authorize ChatGPT to operate your OpenHands conversations for the LifeSort repository.</p><form method="post" action="/login"><input type="hidden" name="return_to" value="${escapeHtml(returnTo)}"><label for="password">Bridge password</label><input id="password" name="password" type="password" required autocomplete="current-password"><button type="submit">Continue</button></form>`);
   }
 
-  const client = await (env as Env & { OAUTH_PROVIDER: { lookupClient(id: string): Promise<{ clientName?: string } | null>; completeAuthorization(args: unknown): Promise<{ redirectTo: string }> } }).OAUTH_PROVIDER.lookupClient(oauthRequest.clientId);
+  const provider = (env as Env & { OAUTH_PROVIDER: { lookupClient(id: string): Promise<{ clientName?: string } | null>; completeAuthorization(args: unknown): Promise<{ redirectTo: string }> } }).OAUTH_PROVIDER;
+  const client = await provider.lookupClient(oauthRequest.clientId);
   if (!client) return html("<h2>Unknown OAuth client</h2>", 400);
-  const provider = (env as Env & { OAUTH_PROVIDER: { completeAuthorization(args: unknown): Promise<{ redirectTo: string }> } }).OAUTH_PROVIDER;
+  const returnTo = safeReturnTo(url.pathname + url.search);
+  if (request.method === "GET") {
+    return html(`<h2>Authorize ChatGPT?</h2><p class="muted">Client: ${escapeHtml(client.clientName ?? "MCP client")}</p><p>This grants access to control OpenHands conversations in <strong>${REPOSITORY}</strong>. It can start tasks, read events, send instructions, and pause or resume sandboxes.</p><form method="post" action="/authorize"><input type="hidden" name="return_to" value="${escapeHtml(returnTo)}"><button type="submit">Approve access</button></form><p class="muted">You can revoke this connection from ChatGPT's connected apps.</p>`);
+  }
+  const form = await request.formData();
+  if (String(form.get("return_to") ?? "") !== returnTo) return html("<h2>Invalid authorization request</h2>", 400);
   const { redirectTo } = await provider.completeAuthorization({
     request: oauthRequest, userId: "lifesort-owner", metadata: { clientName: client.clientName ?? "MCP client" },
     scope: oauthRequest.scope.filter((scope: string) => scope === "openhands:control"),
