@@ -26,10 +26,6 @@ function b64url(bytes: Uint8Array): string {
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
-function fromB64url(value: string): Uint8Array {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((value.length + 3) % 4);
-  return Uint8Array.from(atob(padded), c => c.charCodeAt(0));
-}
 async function sign(value: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   return b64url(new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(value))));
@@ -45,7 +41,9 @@ async function validSession(request: Request, env: Env): Promise<boolean> {
   const a = new TextEncoder().encode(signature);
   const b = new TextEncoder().encode(expected);
   if (a.length !== b.length) return false;
-  return crypto.subtle.timingSafeEqual ? crypto.subtle.timingSafeEqual(a, b) : a.every((v, i) => v === b[i]);
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+  return difference === 0;
 }
 async function createSession(env: Env): Promise<string> {
   const expiry = String(Date.now() + 8 * 60 * 60 * 1000);
